@@ -1,0 +1,18 @@
+# Runtime memory (accumulates per-user; don't share your local one)
+memory_store.json
+memory_store.json.tmp
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+env/
+
+# Editors
+.vscode/
+.idea/
+*.swp
+.DS_Store
