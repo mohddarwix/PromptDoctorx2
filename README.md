@@ -52,6 +52,14 @@ improved prompt anywhere.
     python main.py --once                       # doctor the clipboard once, exit
     python main.py --prompt "summarize X"       # doctor a specific string
 
+### Streamlit frontend
+
+    streamlit run app.py
+
+Opens in your browser. Sidebar shows learned lessons and session stats.
+The CLI hotkey mode (`python main.py`) still works — Streamlit is an
+additional frontend, not a replacement.
+
 Use --prompt mode on WSL, SSH, or Wayland — anywhere global hotkeys don't work.
 
 ## Configuration
