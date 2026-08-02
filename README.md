@@ -75,6 +75,22 @@ Environment variables (all optional):
 | MAX_ITERATIONS | 3 | Hard cap on the loop. |
 | SCORE_THRESHOLD | 8 | Judge score at which the loop declares success. |
 | MEMORY_PATH | memory_store.json | Where the aggregate-lesson counter lives. |
+| HISTORY_PATH | runs.jsonl | Where the per-session run log lives. |
+
+## Evaluation
+
+A small automated eval suite lives in `eval/`. It runs PromptDoctor against
+5 known-bad prompts and scores it on:
+- **Issue recall** — did the judge catch the expected weaknesses?
+- **Final-fix rate** — did the final prompt contain the expected fix?
+- **Convergence rate** — how often did the loop reach the threshold?
+
+Run with:
+
+    python eval/run_eval.py
+
+Results are written to `eval/eval_results.jsonl`. Add new test prompts by
+editing `eval/test_prompts.json`.
 
 ## Platform notes
 
