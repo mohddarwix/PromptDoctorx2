@@ -1,0 +1,42 @@
+[
+  {
+    "id": "tweet_ai_safety",
+    "rough_prompt": "write a tweet about AI safety",
+    "expected_issues": ["no_length_constraint", "vague_task"],
+    "final_check": {
+      "must_contain_any_of": ["280", "character", "words", "brief", "concise"]
+    }
+  },
+  {
+    "id": "summarize_article",
+    "rough_prompt": "summarize this",
+    "expected_issues": ["missing_context", "no_length_constraint"],
+    "final_check": {
+      "must_contain_any_of": ["article", "text", "content", "document"]
+    }
+  },
+  {
+    "id": "json_extraction",
+    "rough_prompt": "get the names from this",
+    "expected_issues": ["missing_output_format", "vague_task"],
+    "final_check": {
+      "must_contain_any_of": ["JSON", "list", "format", "array"]
+    }
+  },
+  {
+    "id": "help_me_code",
+    "rough_prompt": "help me with my code",
+    "expected_issues": ["missing_context", "vague_task"],
+    "final_check": {
+      "must_contain_any_of": ["language", "problem", "specific", "describe"]
+    }
+  },
+  {
+    "id": "creative_story",
+    "rough_prompt": "write a story",
+    "expected_issues": ["no_length_constraint", "vague_task", "no_tone_specified"],
+    "final_check": {
+      "must_contain_any_of": ["genre", "words", "tone", "character", "setting"]
+    }
+  }
+]
