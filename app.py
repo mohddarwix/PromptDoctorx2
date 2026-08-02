@@ -123,6 +123,18 @@ with tab_doctor:
         help="Paste the prompt you're about to send to ChatGPT, Claude, or another LLM.",
     )
 
+    # HITL state
+    if "hitl_state" not in st.session_state:
+        st.session_state.hitl_state = None
+    if "hitl_prompt" not in st.session_state:
+        st.session_state.hitl_prompt = ""
+
+    hitl_mode = st.toggle(
+        "Human in the loop",
+        value=False,
+        help="Review each iteration's issues before the reviser rewrites the prompt.",
+    )
+
     col_a, col_b = st.columns([1, 5])
     with col_a:
         run_btn = st.button("🩺 Doctor prompt", type="primary", use_container_width=True)
@@ -137,10 +149,81 @@ with tab_doctor:
         os.environ["MAX_ITERATIONS"] = str(max_iter)
         os.environ["SCORE_THRESHOLD"] = str(threshold)
 
-        with st.spinner("Running the agent loop..."):
-            traj = doctor(rough, verbose=False)
+        if hitl_mode:
+            st.session_state.hitl_state = {"current_prompt": rough, "phase": "start"}
+            st.session_state.hitl_prompt = rough
+            st.rerun()
+        else:
+            with st.spinner("Running the agent loop..."):
+                traj = doctor(rough, verbose=False)
+            _render_completed_trajectory(traj)
 
-        _render_completed_trajectory(traj)
+    # HITL: continue an in-progress session
+    if hitl_mode and st.session_state.hitl_state is not None:
+        from agent import doctor_step, Trajectory
+
+        state = st.session_state.hitl_state
+
+        # If a button (Accept/Skip/Stop) just set a pending decision while we
+        # were parked at "await_user", consume it first. Otherwise the loop
+        # below would see phase == "await_user" and never call doctor_step
+        # again, silently re-rendering the same stale pause screen forever.
+        if state.get("phase") == "await_user" and "user_decision" in state:
+            state = doctor_step(state)
+
+        while state.get("phase") not in ("await_user", "done"):
+            state = doctor_step(state)
+
+        if state.get("iterations"):
+            st.markdown("#### Iterations so far")
+            for it in state["iterations"]:
+                _render_iteration(it, is_final=False)
+
+        if state.get("phase") == "await_user":
+            verdict = state["pending_verdict"]
+            score = int(verdict.get("score", 0))
+            issues = verdict.get("issues", []) or []
+
+            st.markdown("---")
+            st.markdown(f"#### Iteration {len(state['iterations']) + 1} — judge's verdict")
+            badge_color = "green" if score >= 8 else "orange" if score >= 5 else "red"
+            st.markdown(f":{badge_color}[**Score: {score} / 10**]")
+
+            if issues:
+                st.markdown("**Issues found:**")
+                for issue in issues:
+                    st.markdown(f"- `{issue.get('type', '?')}` — {issue.get('description', '')}")
+
+            st.markdown("**What do you want to do?**")
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                if st.button("✅ Accept revision", use_container_width=True, key="hitl_accept"):
+                    state["user_decision"] = "accept"
+                    st.rerun()
+            with c2:
+                if st.button("⏭️ Skip (retry same)", use_container_width=True, key="hitl_skip"):
+                    state["user_decision"] = "skip"
+                    st.rerun()
+            with c3:
+                if st.button("🛑 Stop here", use_container_width=True, key="hitl_stop"):
+                    state["user_decision"] = "stop"
+                    st.rerun()
+
+        elif state.get("phase") == "done":
+            traj = Trajectory(
+                original_prompt=st.session_state.hitl_prompt,
+                final_prompt=state["current_prompt"],
+                iterations=state["iterations"],
+                converged=state.get("converged", False),
+                stopped_reason=state.get("stopped_reason", ""),
+            )
+            run_history.append_run(traj)
+            st.markdown("---")
+            _render_completed_trajectory(traj)
+
+            if st.button("Start a new run", key="hitl_reset"):
+                st.session_state.hitl_state = None
+                st.rerun()
 
 
 # --- History tab ------------------------------------------------------------

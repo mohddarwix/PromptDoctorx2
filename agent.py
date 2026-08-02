@@ -158,3 +158,120 @@ def doctor(rough_prompt: str, verbose: bool = True) -> Trajectory:
     traj.final_prompt = current
     run_history.append_run(traj)
     return traj
+
+
+def doctor_step(state: dict) -> dict:
+    """
+    Advance the agent by ONE step. Stateless in itself, the caller (Streamlit or CLI)
+    holds the state dict between calls.
+
+    State shape:
+        {
+            "current_prompt": str,
+            "iterations": [Iteration, ...],
+            "lessons": [str, ...],
+            "memory_store": dict,
+            "phase": "run" | "judge" | "await_user" | "revise" | "done",
+            "pending_verdict": dict or None,
+            "converged": bool,
+            "stopped_reason": str,
+        }
+
+    Returns the mutated state. Caller decides when to call again.
+    """
+    max_iter = _max_iterations()
+    threshold = _score_threshold()
+
+    phase = state.get("phase", "start")
+
+    if phase == "start":
+        state["current_prompt"] = state.get("current_prompt", "").strip()
+        state["iterations"] = []
+        state["memory_store"] = memory.load()
+        state["lessons"] = memory.top_lessons(state["memory_store"], k=5)
+        state["converged"] = False
+        state["stopped_reason"] = ""
+        state["phase"] = "run"
+        return state
+
+    if phase == "run":
+        try:
+            output = run_prompt(state["current_prompt"])
+        except Exception as e:
+            state["phase"] = "done"
+            state["stopped_reason"] = f"executor_error: {e}"
+            memory.save(state["memory_store"])
+            return state
+
+        state["_last_output"] = output
+
+        try:
+            verdict = judge_prompt(state["current_prompt"], output, state["lessons"])
+        except Exception as e:
+            state["phase"] = "done"
+            state["stopped_reason"] = f"judge_error: {e}"
+            memory.save(state["memory_store"])
+            return state
+
+        state["pending_verdict"] = verdict
+        state["phase"] = "await_user"
+        return state
+
+    if phase == "await_user":
+        # Caller must set state["user_decision"] to "accept" | "skip" | "stop"
+        # before calling again.
+        decision = state.pop("user_decision", None)
+        if not decision:
+            return state  # still waiting
+
+        verdict = state["pending_verdict"]
+        score = int(verdict.get("score", 0))
+        issues = verdict.get("issues", []) or []
+        issue_types = [str(it.get("type", "unknown")) for it in issues]
+
+        state["iterations"].append(Iteration(
+            number=len(state["iterations"]) + 1,
+            prompt=state["current_prompt"],
+            output_length=len(state.get("_last_output", "")),
+            score=score,
+            issue_types=issue_types,
+        ))
+        memory.learn(state["memory_store"], issue_types)
+
+        if decision == "stop":
+            state["phase"] = "done"
+            state["stopped_reason"] = "user_stopped"
+            memory.save(state["memory_store"])
+            return state
+
+        if score >= threshold:
+            state["phase"] = "done"
+            state["converged"] = True
+            state["stopped_reason"] = "converged"
+            memory.save(state["memory_store"])
+            return state
+
+        if len(state["iterations"]) >= max_iter:
+            state["phase"] = "done"
+            state["stopped_reason"] = "iteration_cap"
+            memory.save(state["memory_store"])
+            return state
+
+        if decision == "skip":
+            state["phase"] = "run"
+            return state
+
+        # decision == "accept", do the revision
+        try:
+            state["current_prompt"] = revise_prompt(state["current_prompt"], issues, state["lessons"])
+        except Exception as e:
+            state["phase"] = "done"
+            state["stopped_reason"] = f"reviser_error: {e}"
+            memory.save(state["memory_store"])
+            return state
+
+        state["phase"] = "run"
+        return state
+
+    # phase == "done"
+    return state

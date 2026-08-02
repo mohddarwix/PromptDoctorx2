@@ -60,6 +60,10 @@ Opens in your browser. Sidebar shows learned lessons and session stats.
 The CLI hotkey mode (`python main.py`) still works — Streamlit is an
 additional frontend, not a replacement.
 
+Toggle **Human in the loop** in the Doctor tab to review each iteration's
+judge verdict before the reviser rewrites the prompt. You can Accept the
+revision, Skip and retry the same prompt, or Stop early with what you have.
+
 Use --prompt mode on WSL, SSH, or Wayland — anywhere global hotkeys don't work.
 
 ## Configuration
