@@ -2,6 +2,9 @@
 memory_store.json
 memory_store.json.tmp
 
+# Local run history (per-user session log; don't share your local one)
+runs.jsonl
+
 # Python
 __pycache__/
 *.pyc
