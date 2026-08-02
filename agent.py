@@ -19,6 +19,7 @@ from dataclasses import dataclass, field
 from typing import List
 
 import memory
+import run_history
 from tools import run_prompt, judge_prompt, revise_prompt
 
 
@@ -155,4 +156,5 @@ def doctor(rough_prompt: str, verbose: bool = True) -> Trajectory:
 
     memory.save(store)
     traj.final_prompt = current
+    run_history.append_run(traj)
     return traj
