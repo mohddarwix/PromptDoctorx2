@@ -92,6 +92,13 @@ Run with:
 Results are written to `eval/eval_results.jsonl`. Add new test prompts by
 editing `eval/test_prompts.json`.
 
+## n8n integration
+
+The [`n8n/`](n8n/) folder packages this agent as a custom n8n node (Gemini-powered,
+since it needs to run headless) and a self-hosted workflow that puts it behind a
+webhook alongside branching, looping, filtering, and error handling. See
+[n8n/README.md](n8n/README.md) for setup and usage.
+
 ## Platform notes
 
 - macOS: first run will prompt for Accessibility permission (System Settings

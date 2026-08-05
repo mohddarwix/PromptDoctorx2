@@ -1,0 +1,21 @@
+services:
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:latest
+    container_name: n8n-homework
+    restart: unless-stopped
+
+    ports:
+      - "5678:5678"
+
+    environment:
+      TZ: Asia/Beirut
+      GENERIC_TIMEZONE: Asia/Beirut
+      N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: "true"
+      N8N_RUNNERS_ENABLED: "true"
+
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./custom:/home/node/.n8n/custom
+
+volumes:
+  n8n_data:

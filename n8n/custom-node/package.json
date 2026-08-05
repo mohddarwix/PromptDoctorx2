@@ -1,0 +1,50 @@
+{
+  "name": "n8n-nodes-prompt-doctor-gemini",
+  "version": "0.1.0",
+  "description": "A custom n8n Prompt Doctor agent powered by the Gemini API",
+  "license": "MIT",
+  "homepage": "https://github.com/mohddarwix/PromptDoctorx2/tree/main/n8n",
+  "keywords": [
+    "n8n-community-node-package"
+  ],
+  "author": {
+    "name": "mohddarwix"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mohddarwix/PromptDoctorx2.git"
+  },
+  "scripts": {
+    "build": "n8n-node build",
+    "build:watch": "tsc --watch",
+    "dev": "n8n-node dev",
+    "lint": "n8n-node lint",
+    "lint:fix": "n8n-node lint --fix",
+    "release": "n8n-node release",
+    "prepublishOnly": "n8n-node prerelease"
+  },
+  "files": [
+    "dist"
+  ],
+  "n8n": {
+    "n8nNodesApiVersion": 1,
+    "strict": true,
+    "credentials": [
+      "dist/credentials/GeminiApi.credentials.js"
+    ],
+    "nodes": [
+      "dist/nodes/PromptDoctor/PromptDoctor.node.js"
+    ]
+  },
+  "devDependencies": {
+    "@n8n/node-cli": "*",
+    "eslint": "9.39.4",
+    "n8n-workflow": "^2.16.0",
+    "prettier": "3.8.3",
+    "release-it": "20.2.0",
+    "typescript": "5.9.3"
+  },
+  "peerDependencies": {
+    "n8n-workflow": "*"
+  }
+}
