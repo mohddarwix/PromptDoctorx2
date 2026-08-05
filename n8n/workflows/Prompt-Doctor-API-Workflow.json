@@ -1,0 +1,730 @@
+{
+  "name": "Prompt Doctor API Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "prompt-doctor",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "e42d5b63-1ed5-4f7a-933e-23f4968a34e6",
+      "name": "Webhook",
+      "webhookId": "2bf13104-5b46-45eb-8bfa-3daccdc8ccc3"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {\n  success: true,\n  processedCount: $input.all().length,\n  results: $input.all().map(item => ({\n    promptId: item.json.promptId ?? null,\n    topic: item.json.topic ?? null,\n    status: item.json.status ?? 'unknown',\n    originalPrompt: item.json.originalPrompt ?? null,\n    finalPrompt: item.json.finalPrompt ?? null,\n    finalScore: item.json.finalScore ?? 0,\n    converged: item.json.converged ?? false,\n    iterationCount: item.json.iterationCount ?? 0,\n    errorMessage: item.json.errorMessage ?? item.json.error?.message ?? null\n  }))\n} }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1088,
+        -80
+      ],
+      "id": "4e284e2f-e5f6-4a2d-be41-078c5dc52d1b",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e59f62f5-06eb-444f-b36a-ac4a5e843958",
+              "name": "prompts",
+              "value": "={{ $json.body.prompts }}",
+              "type": "array"
+            },
+            {
+              "id": "2669e25f-d991-48f2-b780-f154b919ca38",
+              "name": "source",
+              "value": "webhook",
+              "type": "string"
+            },
+            {
+              "id": "d5f848bc-6651-4fe2-ad4c-987fb88ae668",
+              "name": "receivedAt",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        224,
+        0
+      ],
+      "id": "8ecf2f4c-9ce2-4380-af88-485ed4e81879",
+      "name": "Normalize Request"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\n\nconst prompts = Array.isArray(input.prompts)\n\t? input.prompts\n\t: [];\n\nreturn prompts.map((entry, index) => {\n\tconst prompt = String(entry?.prompt ?? '').trim();\n\tconst topic = String(entry?.topic ?? '').trim();\n\n\tconst normalizedTopic = topic\n\t\t.toLowerCase()\n\t\t.replace(/[^a-z0-9]+/g, '_')\n\t\t.replace(/^_+|_+$/g, '');\n\n\treturn {\n\t\tjson: {\n\t\t\tpromptId: index + 1,\n\t\t\tprompt,\n\t\t\ttopic,\n\t\t\tnormalizedTopic,\n\t\t\tpromptLength: prompt.length,\n\t\t\tisValid: prompt.length > 5 && topic.length > 0,\n\t\t\tstatus: 'pending',\n\t\t\tsource: input.source ?? 'webhook',\n\t\t\treceivedAt: input.receivedAt ?? new Date().toISOString(),\n\t\t},\n\t\tpairedItem: {\n\t\t\titem: 0,\n\t\t},\n\t};\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ],
+      "id": "093fdd67-5868-4e2f-a464-c4b6942079bc",
+      "name": "Expand & Enrich Prompts"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "4b35594e-bfae-40b0-a4f2-2947cbca9767",
+              "leftValue": "={{ $json.isValid }}",
+              "rightValue": "=",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "position": [
+        672,
+        0
+      ],
+      "id": "07c5317e-364b-4057-a2fc-e79f9f12fdbd",
+      "name": "Keep Valid Prompts"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        896,
+        0
+      ],
+      "id": "429c2da1-076c-451e-af6b-c32065d7c775",
+      "name": "Process Prompts One by One"
+    },
+    {
+      "parameters": {
+        "url": "https://en.wikipedia.org/w/rest.php/v1/search/page",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "=q",
+              "value": "={{ $json.topic }}"
+            },
+            {
+              "name": "limit",
+              "value": "1"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Api-User-Agent",
+              "value": "PromptDoctorHomework/1.0"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1088,
+        112
+      ],
+      "id": "b25b8d70-5902-47d4-a703-1e20d5dbdb2b",
+      "name": "Search Wikipedia",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "3676fe41-e6b7-4132-b1e2-7f17a47d70d5",
+              "name": "promptId",
+              "value": "={{ $('Process Prompts One by One').item.json.promptId }}",
+              "type": "number"
+            },
+            {
+              "id": "84a94b9c-a6ca-4c61-a147-0c0b3590b899",
+              "name": "originalPrompt",
+              "value": "={{ $('Process Prompts One by One').item.json.prompt }}",
+              "type": "string"
+            },
+            {
+              "id": "741035f7-619e-4d37-b9bd-0a62ac111ed8",
+              "name": "topic",
+              "value": "={{ $('Process Prompts One by One').item.json.topic }}",
+              "type": "string"
+            },
+            {
+              "id": "fe7b0147-6ac2-4e47-aaf2-08fbdabbce14",
+              "name": "wikipediaTitle",
+              "value": "={{ $json.pages?.[0]?.title || 'No result found' }}",
+              "type": "string"
+            },
+            {
+              "id": "47aebf02-45d5-4888-80ed-c17f66897508",
+              "name": "wikipediaDescription",
+              "value": "={{ $json.pages?.[0]?.description || 'No description available' }}",
+              "type": "string"
+            },
+            {
+              "id": "41f055cb-7979-4008-bd3f-3ef2c24e8027",
+              "name": "wikipediaExcerpt",
+              "value": "={{ ($json.pages?.[0]?.excerpt || 'No excerpt available').replace(/<[^>]*>/g, '') }}",
+              "type": "string"
+            },
+            {
+              "id": "7f1615ae-c84c-4c07-be43-10ba6da0ad8d",
+              "name": "agentPrompt",
+              "value": "={{ `${$('Process Prompts One by One').item.json.prompt}  Use the following reference information when it is relevant:  Title: ${$json.pages?.[0]?.title || 'No Wikipedia result'} Description: ${$json.pages?.[0]?.description || 'No description available'} Excerpt: ${($json.pages?.[0]?.excerpt || 'No excerpt available').replace(/<[^>]*>/g, '')}  Improve this prompt so that it is clear, specific, well-structured, and suitable for producing an accurate answer. Preserve the original intent and do not invent unsupported facts.` }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        1312,
+        64
+      ],
+      "id": "98e60c73-defb-47ff-9ce5-534b36ee46d5",
+      "name": "Build Agent Input"
+    },
+    {
+      "parameters": {
+        "prompt": "={{ $json.agentPrompt }}"
+      },
+      "type": "CUSTOM.promptDoctor",
+      "typeVersion": 1,
+      "position": [
+        1536,
+        16
+      ],
+      "id": "31f66d72-5065-41be-a7ae-9014c51a6416",
+      "name": "Prompt Doctor Agent",
+      "credentials": {
+        "geminiApi": {
+          "id": "gym3l9wv20vO4A7I",
+          "name": "Gemini account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.success === false || Boolean($json.error) }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    },
+                    "id": "f079ebd5-f07e-46ec-b2be-08811f14d73f"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Error"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "74738463-0651-4776-a4b1-d7d56249d667",
+                    "leftValue": "={{ $json.success !== false && Number($json.finalScore ?? 0) >= 8 }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Approved"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "21213079-65e3-4a3e-a95f-148abbd05a93",
+                    "leftValue": "={{ $json.success !== false && Number($json.finalScore ?? 0) < 8 }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Needs Review"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        1776,
+        0
+      ],
+      "id": "09da7658-bfaa-41eb-8572-9d055a67048f",
+      "name": "Route Agent Result"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "9c879d53-8cdb-4b07-bdcd-e4a64e4aa526",
+              "name": "status",
+              "value": "approved",
+              "type": "string"
+            },
+            {
+              "id": "b0adca02-8967-4a9e-911e-5b6e070f6ee4",
+              "name": "approved",
+              "value": true,
+              "type": "boolean"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        2080,
+        -96
+      ],
+      "id": "e6c53814-0235-4965-88f3-5b167de53c2b",
+      "name": "Mark as Approved"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b57e66ec-f9fb-4f77-b4b8-aa2b6038ef72",
+              "name": "status",
+              "value": "needs_review",
+              "type": "string"
+            },
+            {
+              "id": "cfb5cf9d-6d8b-4d60-9b06-8ba2c900a7eb",
+              "name": "approved",
+              "value": false,
+              "type": "boolean"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        2080,
+        80
+      ],
+      "id": "eb532907-971f-4921-9f11-bd6c3d3f43a9",
+      "name": "Mark as Needs Review"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "5b122aba-e7c9-4e86-b8db-485b6511ef14",
+              "name": "status",
+              "value": "error",
+              "type": "string"
+            },
+            {
+              "id": "d3ee063d-124e-4bb4-913e-b2dccec17dba",
+              "name": "approved",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "d4d40f33-e878-4c95-be78-617b5147f482",
+              "name": "finalPrompt",
+              "value": "={{ $json.finalPrompt || $json.originalPrompt || $('Process Prompts One by One').item.json.prompt }}",
+              "type": "string"
+            },
+            {
+              "id": "91034ba1-5678-4801-aa52-7b2229c51265",
+              "name": "finalScore",
+              "value": "={{ Number($json.finalScore ?? 0) }}",
+              "type": "number"
+            },
+            {
+              "id": "4a671872-9776-4545-9561-8b7609a7877e",
+              "name": "errorMessage",
+              "value": "={{ $json.error?.message || $json.error || $json.message || 'Prompt Doctor execution failed' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        2080,
+        256
+      ],
+      "id": "8b44d4ea-9bda-4281-b2e6-8c0608e9fc92",
+      "name": "Handle Agent Error"
+    },
+    {
+      "parameters": {
+        "numberInputs": 3
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        2336,
+        256
+      ],
+      "id": "1d9bcb6e-ecf6-457a-8dc1-57497f2ab941",
+      "name": "Merge Agent Results"
+    },
+    {
+      "parameters": {
+        "content": "## Input and Validation\nThe workflow starts with a POST Webhook that receives an array of prompts.\n\nNormalize Request extracts the required fields.\n\nExpand & Enrich Prompts converts the array into separate n8n items, generates IDs, calculates prompt length, and adds validation metadata.\n\nKeep Valid Prompts removes empty or very short prompts before processing.",
+        "height": 432,
+        "width": 256
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -64,
+        144
+      ],
+      "typeVersion": 1,
+      "id": "f1377a43-5cb2-43a4-8196-e8406cc75cd0",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "## Loop and External API\nProcess Prompts One by One loops through the valid prompts with a batch size of 1.\n\nSearch Wikipedia calls a real public API using the topic of each prompt.\n\nBuild Agent Input combines the original prompt with relevant Wikipedia context and prepares a structured input for the custom agent.",
+        "height": 368,
+        "width": 256
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        560,
+        176
+      ],
+      "typeVersion": 1,
+      "id": "8335b973-2f72-4e50-9bbd-f6c2a31f1238",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "## Custom Prompt Doctor Agent\nThis custom n8n node improves prompts using the Gemini API.\n\nThe agent follows an iterative loop:\n\nExecutor → Judge → Score Check → Reviser\n\nIt repeats until the score threshold is reached or the maximum number of iterations is completed.\n\nThe Gemini API key is stored securely in n8n Credentials and is not hardcoded.",
+        "height": 416,
+        "width": 256
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1408,
+        -416
+      ],
+      "typeVersion": 1,
+      "id": "14720133-b2de-4f65-8969-4405fd103497",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "content": "## Routing, Error Handling and Output\nRoute Agent Result uses a Switch node to classify each result as Approved, Needs Review, or Error.\n\nEach branch adds a clear status before the results are combined using the Merge node.\n\nWikipedia and Prompt Doctor errors continue through a handled fallback path.\n\nAfter all items finish processing, Respond to Webhook returns the final JSON response to the caller.",
+        "height": 512,
+        "width": 256
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1728,
+        -544
+      ],
+      "typeVersion": 1,
+      "id": "acb7560d-08e0-49e8-872e-21c349242f7a",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "content": "## Workflow Output\nThe final response contains the original prompt, improved prompt, s core, convergence status, iteration count, and any handled error message.",
+        "height": 192,
+        "width": 256
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1008,
+        -288
+      ],
+      "typeVersion": 1,
+      "id": "6aa95878-dc24-4c07-be89-baf5ac26055b",
+      "name": "Sticky Note4"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Normalize Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Request": {
+      "main": [
+        [
+          {
+            "node": "Expand & Enrich Prompts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Expand & Enrich Prompts": {
+      "main": [
+        [
+          {
+            "node": "Keep Valid Prompts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Keep Valid Prompts": {
+      "main": [
+        [
+          {
+            "node": "Process Prompts One by One",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Prompts One by One": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Search Wikipedia",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Wikipedia": {
+      "main": [
+        [
+          {
+            "node": "Build Agent Input",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle Agent Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Agent Input": {
+      "main": [
+        [
+          {
+            "node": "Prompt Doctor Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prompt Doctor Agent": {
+      "main": [
+        [
+          {
+            "node": "Route Agent Result",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle Agent Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Agent Result": {
+      "main": [
+        [
+          {
+            "node": "Handle Agent Error",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark as Approved",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark as Needs Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle Agent Error": {
+      "main": [
+        [
+          {
+            "node": "Merge Agent Results",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Mark as Needs Review": {
+      "main": [
+        [
+          {
+            "node": "Merge Agent Results",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Mark as Approved": {
+      "main": [
+        [
+          {
+            "node": "Merge Agent Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Agent Results": {
+      "main": [
+        [
+          {
+            "node": "Process Prompts One by One",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "a1f6f178-f4e0-4d32-8ac6-aee5b0c17987",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "a1db7a6d78b38658968d70ac5a35eba4f6aa244799cbcfdaf22a5e9d23e7600c"
+  },
+  "nodeGroups": [],
+  "id": "nQgCpRSJtTWyH0gl",
+  "tags": []
+}
